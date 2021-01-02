@@ -129,6 +129,14 @@ public class Search {
         return false;
     }
 
+    public static int l_0(int[] s1, int[] s2) {
+        int sum = 0;
+        for (int i = 0; i < s1.length; i++) {
+            sum += s1[i] + s2[i];
+        }
+        return sum;
+    }
+
     static class Solution {
         int[] s1;
         int[] s2;
@@ -200,6 +208,10 @@ public class Search {
             best[color] = value;
         }
 
+        public int markCount() {
+            return color.size();
+        }
+
         public static class Basin {
             int count;
             double value;
@@ -211,19 +223,26 @@ public class Search {
         }
 
         public TreeMap<Integer, Basin> histogram() {
-            int[] counts = new int[best.length];
-            for (Solution w : color.keySet()) {
-                int c = getColor(w);
-                counts[c]++;
+            int[] counts = new int[maxColor + 1];
+            for (Integer c : color.values()) {
+                if (c >= 0) {
+                    counts[c]++;
+                }
             }
             TreeMap<Integer, Basin> basins = new TreeMap<>();
-            for (int c = 0; c < maxColor; c++) {
+            for (int c = 0; c <= maxColor; c++) {
                 if (counts[c] > 5) {
                     basins.put(c, new Basin(counts[c], best[c]));
                 }
             }
             return basins;
         }
+    }
+
+    enum searchMode {
+        GREEDY,
+        FUSSY,
+        EXHAUSTIVE
     }
 
     /**
@@ -242,10 +261,10 @@ public class Search {
      * @param step2   Offset from base of search
      * @param limit   Maximum length of path to search
      * @param history History of marked paths
-     * @param greedy  If true, only consider steps to neighbors with better scores
+     * @param greedy  Determines which neighbors get searched, best, better or all
      * @return The color of the best minimum from this starting point
      */
-    static int treeSearch(int[] base1, int[] step1, int[] base2, int[] step2, int limit, double sign, HistoryMap history, boolean greedy) {
+    static int treeSearch(int[] base1, int[] step1, int[] base2, int[] step2, int limit, double sign, HistoryMap history, searchMode greedy) {
         if (limit < 0) {
             // in too deep
             return -2;
@@ -269,9 +288,10 @@ public class Search {
         // mark current square as being in progress
         history.mark(step1, step2, -1);
 
-        // scan the neighbors
+        // scan the neighbors, sort by local score
         int[] x1 = repI(-1, base1.length);
         int[] x2 = repI(-1, base1.length);
+        PriorityQueue<ScoredSolution> neighborQ = new PriorityQueue<>();
         do {
             sum(n1, step1, x1);
             if (anyNegative(n1)) {
@@ -281,25 +301,32 @@ public class Search {
             if (anyNegative(n2)) {
                 continue;
             }
-
-            if (greedy) {
-                // don't consider any neighbors but those that show short term win
-                double vn = sign * g8(diff(null, base1, n1), diff(null, base2, n2));
-                if (vn > v) {
-                    continue;
-                }
-            }
-
-            int c = treeSearch(base1, n1, base2, n2, limit - 1, sign, history, greedy);
-            if (c > 0) {
-                // found a solution for this neighbor, but is it better?
-                double vx = history.getBest(c);
-                if (vx < myBest) {
-                    myColor = c;
-                    myBest = vx;
-                }
-            }
+            double vn = sign * g8(diff(null, base1, n1), diff(null, base2, n2));
+            neighborQ.add(new ScoredSolution(vn, n1, n2));
         } while (neighbors(x1, x2));
+
+        // now descend into best neighbors (GREEDY) or better (FUSSY) or all (EXHAUSTIVE)
+        assert neighborQ.peek() != null;
+        double vn = neighborQ.peek().score;
+        for (ScoredSolution solution : neighborQ) {
+            if (greedy == searchMode.EXHAUSTIVE ||
+                    (greedy == searchMode.FUSSY && solution.score < v) ||
+                    (greedy == searchMode.GREEDY && solution.score <= vn)) {
+                int c = treeSearch(base1, solution.x1, base2, solution.x2, limit - 1, sign, history, greedy);
+                if (c > 0) {
+                    // found a solution for this neighbor, but is it better?
+                    double vx = history.getBest(c);
+                    if (vx < myBest) {
+                        myColor = c;
+                        myBest = vx;
+                    }
+                }
+            } else {
+                // we will only ever look at a prefix
+                break;
+            }
+        }
+
         if (myColor <= 0) {
             myColor = history.nextColor();
             history.setBest(myColor, v);

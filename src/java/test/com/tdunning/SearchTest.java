@@ -47,7 +47,7 @@ public class SearchTest {
             }
             Long h = Arrays.hashCode(e1) + 10031L * Arrays.hashCode(e2);
             if (hashes.contains(h)) {
-                System.out.printf("duplicate\n");
+                System.out.print("duplicate\n");
             }
             hashes.add(h);
             count++;
@@ -119,21 +119,22 @@ public class SearchTest {
         int[] s1 = Search.repI(0, 4);
         int[] s2 = Search.repI(0, 4);
         int limit = 22;
+        int minCount = 10000;
         do {
-            if (history.getColor(s1, s2) == 0) {
-                Search.treeSearch(b1, s1, b2, s2, limit, 1, history, true);
-                Map<Integer, Search.HistoryMap.Basin> histogram = history.histogram();
-                for (Integer c : histogram.keySet()) {
-                    Search.HistoryMap.Basin h = histogram.get(c);
-                    System.out.printf("%2d %9d %.3f\n", c, h.count, h.value);
+            int remainder = limit - Search.l_0(s1, s2);
+            if (remainder > 0 && history.getColor(s1, s2) == 0) {
+                Search.treeSearch(b1, s1, b2, s2, remainder, 1, history, Search.searchMode.EXHAUSTIVE);
+                if (history.markCount() > minCount) {
+                    minCount *= 2;
+                    System.out.printf("  >> %d <<\n", history.markCount());
+                    Map<Integer, Search.HistoryMap.Basin> histogram = history.histogram();
+                    for (Integer c : histogram.keySet()) {
+                        Search.HistoryMap.Basin h = histogram.get(c);
+                        System.out.printf("%2d %9d %.3f\n", c, h.count, h.value);
+                    }
+                    System.out.print("\n");
                 }
-                System.out.printf("\n");
             }
         } while (Search.increment(s1, s2, b1, b2, limit));
-        Map<Integer, Search.HistoryMap.Basin> histogram = history.histogram();
-        for (Integer c : histogram.keySet()) {
-            Search.HistoryMap.Basin h = histogram.get(c);
-            System.out.printf("%2d %9d %.3f\n", c, h.count, h.value);
-        }
     }
 }
